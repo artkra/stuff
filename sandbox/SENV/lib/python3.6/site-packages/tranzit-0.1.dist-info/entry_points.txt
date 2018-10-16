@@ -1,0 +1,3 @@
+[console_scripts]
+tranzit = tranzit:cli_handler
+

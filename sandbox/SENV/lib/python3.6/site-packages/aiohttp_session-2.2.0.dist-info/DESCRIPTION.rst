@@ -1,0 +1,213 @@
+aiohttp_session
+===============
+.. image:: https://travis-ci.org/aio-libs/aiohttp-session.svg?branch=master
+    :target: https://travis-ci.org/aio-libs/aiohttp-session
+.. image:: https://codecov.io/github/aio-libs/aiohttp-session/coverage.svg?branch=master
+    :target: https://codecov.io/github/aio-libs/aiohttp-session
+.. image:: https://readthedocs.org/projects/aiohttp-session/badge/?version=latest
+    :target: https://aiohttp-session.readthedocs.io/
+.. image:: https://img.shields.io/pypi/v/aiohttp-session.svg
+    :target: https://pypi.python.org/pypi/aiohttp-session
+
+The library provides sessions for `aiohttp.web`__.
+
+.. _aiohttp_web: https://aiohttp.readthedocs.io/en/latest/web.html
+
+__ aiohttp_web_
+
+Usage
+-----
+
+The library allows us to store user-specific data into a session object.
+
+The session object has a dict-like interface (operations like
+``session[key] = value``, ``value = session[key]`` etc. are present).
+
+
+Before processing the session in a web-handler, you have to register the
+*session middleware* in ``aiohttp.web.Application``.
+
+A trivial usage example::
+
+    import time
+    import base64
+    from cryptography import fernet
+    from aiohttp import web
+    from aiohttp_session import setup, get_session
+    from aiohttp_session.cookie_storage import EncryptedCookieStorage
+
+
+    async def handler(request):
+        session = await get_session(request)
+        last_visit = session['last_visit'] if 'last_visit' in session else None
+        session['last_visit'] = time.time()
+        text = 'Last visited: {}'.format(last_visit)
+        return web.Response(text=text)
+
+
+    def make_app():
+        app = web.Application()
+        # secret_key must be 32 url-safe base64-encoded bytes
+        fernet_key = fernet.Fernet.generate_key()
+        secret_key = base64.urlsafe_b64decode(fernet_key)
+        setup(app, EncryptedCookieStorage(secret_key))
+        app.router.add_get('/', handler)
+        return app
+
+
+    web.run_app(make_app())
+
+
+All storages use an HTTP Cookie named ``AIOHTTP_SESSION`` for storing
+data. This can be modified by passing the keyword argument ``cookie_name`` to
+the storage class of your choice.
+
+Available session storages are:
+
+* ``aiohttp_session.SimpleCookieStorage()`` -- keeps session data as a
+  plain JSON string in the cookie body. Use the storage only for testing
+  purposes, it's very non-secure.
+
+* ``aiohttp_session.cookie_storage.EncryptedCookieStorage(secret_key)``
+  -- stores the session data into a cookie as ``SimpleCookieStorage`` but
+  encodes it via AES cipher. ``secrect_key`` is a ``bytes`` key for AES
+  encryption/decryption, the length should be 32 bytes.
+
+  Requires ``cryptography`` library::
+
+      $ pip install aiohttp_session[secure]
+
+* ``aiohttp_session.redis_storage.RedisStorage(redis_pool)`` -- stores
+  JSON encoded data in *redis*, keeping only the redis key (a random UUID) in
+  the cookie. ``redis_pool`` is a ``aioredis`` pool object, created by
+  ``await aioredis.create_resid_pool(...)`` call.
+
+  Requires ``aioredis`` library (olny versions ``1.0+`` are supported::
+
+      $ pip install aiohttp_session[aioredis]
+
+License
+-------
+
+``aiohttp_session`` is offered under the Apache 2 license.
+
+Changes
+=======
+
+2.2.0 (2018-01-31)
+------------------
+
+- Fixed the formatting of an error handling bad middleware return types. #249
+
+2.1.0 (2017-11-24)
+------------------
+
+- Add `session.set_new_identity()` method for changing identity for a
+  new session #236
+
+2.0.1 (2017-11-22)
+------------------
+
+- Replace assertions in aioredis installation checks by `RuntimeError` #235
+
+2.0.0 (2017-11-21)
+------------------
+
+- Update to aioredis 1.0+. The aiohttp-session 2.0 is not compatible
+  with aioredis 0.X #234
+
+1.2.1 (2017-11-20)
+------------------
+
+- Pin aioredis<1.0 #231
+
+1.2.0 (2017-11-06)
+------------------
+
+- Add MemcachedStorage #224
+
+1.1.0 (2017-11-03)
+------------------
+
+- Upgrade middleware to new style from aiohttp 2.3+
+
+
+1.0.1 (2017-09-13)
+------------------
+
+- Add key_factory attribute for redis_storage #205
+
+1.0.0 (2017-07-27)
+------------------
+
+- Catch decoder exception in RedisStorage on data load #175
+
+- Specify domain and path on cookie deletion #171
+
+0.8.0 (2016-12-04)
+------------------
+
+- Use `time.time()` instead of `time.monotonic()` for absolute times #81
+
+0.7.0 (2016-09-24)
+------------------
+
+- Fix tests to be compatible with aiohttp upstream API for client cookies
+
+0.6.0 (2016-09-08)
+------------------
+
+- Add expires field automatically to support older browsers #43
+
+- Respect session.max_age in redis storage #45
+
+- Always pass default max_age from storage into session #45
+
+0.5.0 (2016-02-21)
+------------------
+
+- Handle cryptography.fernet.InvalidToken exception by providing an
+  empty session #29
+
+0.4.0 (2016-01-06)
+------------------
+
+- Add optional NaCl encrypted storage #20
+
+- Relax EncryptedCookieStorage to accept base64 encoded string,
+  e.g. generated by Fernet.generate_key.
+
+- Add setup() function
+
+- Save the session even on exception in the middleware chain
+
+0.3.0 (2015-11-20)
+------------------
+
+- Reflect aiohttp changes: minimum required Python version is 3.4.1
+
+- Use explicit 'aiohttp_session' package
+
+0.2.0 (2015-09-07)
+------------------
+
+- Add session.created property #14
+
+- Replaced PyCrypto with crypthography library #16
+
+0.1.2 (2015-08-07)
+------------------
+
+- Add manifest file #15
+
+0.1.1 (2015-04-20)
+------------------
+
+- Fix #7: stop cookie name growing each time session is saved
+
+
+0.1.0 (2015-04-13)
+------------------
+
+- First public release
+
